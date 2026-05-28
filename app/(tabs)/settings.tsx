@@ -1,30 +1,28 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import SelectCurrencyModal from '@/components/select-currency-modal';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth';
+import { useCurrency } from '@/context/currency-context';
 
 type SettingRow = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
   danger?: boolean;
+  value?: string;
+  onPress?: () => void;
 };
 
 const ACCOUNT_SETTINGS: SettingRow[] = [
-  { icon: 'person-outline', label: 'Account Information' },
-  { icon: 'key-outline', label: 'Change Password' },
-  { icon: 'phone-portrait-outline', label: 'Device' },
-  { icon: 'business-outline', label: 'Connect to Banks' },
-];
-
-const APP_SETTINGS: SettingRow[] = [
-  { icon: 'settings-outline', label: 'Preferences' },
-  { icon: 'notifications-outline', label: 'Notifications' },
-  { icon: 'color-palette-outline', label: 'Appearance' },
-  { icon: 'help-circle-outline', label: 'Help & Support' },
-  { icon: 'information-circle-outline', label: 'About' },
+  { icon: 'person-outline',        label: 'Account Information' },
+  { icon: 'key-outline',           label: 'Change Password' },
+  { icon: 'phone-portrait-outline',label: 'Device' },
+  { icon: 'business-outline',      label: 'Connect to Banks' },
 ];
 
 function SettingItem({
@@ -44,7 +42,8 @@ function SettingItem({
         style={({ pressed }) => [
           styles.settingRow,
           pressed && { backgroundColor: tint + '0C' },
-        ]}>
+        ]}
+        onPress={item.onPress}>
         <View style={[styles.settingIconWrap, { backgroundColor: tint + '18' }]}>
           <Ionicons name={item.icon} size={18} color={item.danger ? '#EF4444' : tint} />
         </View>
@@ -54,6 +53,9 @@ function SettingItem({
           darkColor={item.danger ? '#EF4444' : undefined}>
           {item.label}
         </ThemedText>
+        {item.value ? (
+          <ThemedText style={[styles.settingValue, { color: tint }]}>{item.value}</ThemedText>
+        ) : null}
         <Ionicons name="chevron-forward" size={16} color={item.danger ? '#EF4444' : border} />
       </Pressable>
       {!isLast && <View style={[styles.rowDivider, { backgroundColor: border, marginLeft: 64 }]} />}
@@ -67,6 +69,27 @@ export default function SettingsScreen() {
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
 
+  const { user, signOut } = useAuth();
+  const { currency } = useCurrency();
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+
+  const displayName  = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
+  const displayEmail = user?.email ?? '';
+
+  const APP_SETTINGS: SettingRow[] = [
+    {
+      icon: 'cash-outline',
+      label: 'Currency',
+      value: `${currency.symbol} ${currency.code}`,
+      onPress: () => setShowCurrencyPicker(true),
+    },
+    { icon: 'settings-outline',          label: 'Preferences' },
+    { icon: 'notifications-outline',     label: 'Notifications' },
+    { icon: 'color-palette-outline',     label: 'Appearance' },
+    { icon: 'help-circle-outline',       label: 'Help & Support' },
+    { icon: 'information-circle-outline',label: 'About' },
+  ];
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -77,9 +100,9 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.profileInfo}>
             <ThemedText type="defaultSemiBold" style={styles.profileName}>
-              John Doe
+              {displayName}
             </ThemedText>
-            <ThemedText style={styles.profileEmail}>johndoe@email.com</ThemedText>
+            <ThemedText style={styles.profileEmail}>{displayEmail}</ThemedText>
           </View>
           <Pressable
             style={({ pressed }) => [
@@ -150,13 +173,19 @@ export default function SettingsScreen() {
           style={({ pressed }) => [
             styles.signOutBtn,
             { backgroundColor: card, borderColor: border, opacity: pressed ? 0.7 : 1 },
-          ]}>
+          ]}
+          onPress={signOut}>
           <Ionicons name="log-out-outline" size={18} color="#EF4444" />
           <ThemedText lightColor="#EF4444" darkColor="#EF4444" style={styles.signOutText}>
             Sign Out
           </ThemedText>
         </Pressable>
       </ScrollView>
+
+      <SelectCurrencyModal
+        visible={showCurrencyPicker}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
     </ThemedView>
   );
 }
@@ -241,6 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   settingLabel: { flex: 1, fontSize: 15 },
+  settingValue:  { fontSize: 14, fontWeight: '600', marginRight: 4 },
   rowDivider: { height: StyleSheet.hairlineWidth },
 
   signOutBtn: {

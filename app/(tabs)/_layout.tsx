@@ -121,8 +121,6 @@ export default function TabLayout() {
             ),
           }}
         />
-        {/* Hide the old explore screen from the tab bar */}
-        <Tabs.Screen name="explore" options={{ href: null }} />
       </Tabs>
 
       <HamburgerMenu visible={menuOpen} onClose={() => setMenuOpen(false)} />

@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth';
 
 type Action = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -26,6 +27,10 @@ export default function ProfileMenu({ visible, onClose }: Props) {
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
 
+  const { user, signOut } = useAuth();
+  const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
+  const displayEmail = user?.email ?? '';
+
   return (
     <Modal
       visible={visible}
@@ -47,9 +52,9 @@ export default function ProfileMenu({ visible, onClose }: Props) {
           </View>
           <View style={styles.profileText}>
             <ThemedText type="defaultSemiBold" style={styles.profileName}>
-              John Doe
+              {displayName}
             </ThemedText>
-            <ThemedText style={styles.profileEmail}>johndoe@email.com</ThemedText>
+            <ThemedText style={styles.profileEmail}>{displayEmail}</ThemedText>
           </View>
         </View>
 
@@ -62,7 +67,7 @@ export default function ProfileMenu({ visible, onClose }: Props) {
                 styles.actionRow,
                 pressed && { backgroundColor: tint + '10' },
               ]}
-              onPress={onClose}>
+              onPress={() => { onClose(); if (action.label === 'Sign Out') signOut(); }}>
               <Ionicons
                 name={action.icon}
                 size={18}

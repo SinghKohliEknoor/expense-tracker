@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -8,13 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
 
 // ─── Reusable input ───────────────────────────────────────────────────────────
 
@@ -104,11 +105,43 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isSignUp = mode === 'signup';
 
-  function handleSubmit() {
-    router.replace('/(tabs)');
+  async function handleSubmit() {
+    setError(null);
+
+    if (isSignUp && password !== confirmPwd) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name } },
+        });
+        if (error) throw error;
+        // Email confirmation is disabled in dev — session fires immediately.
+        // If enabled, data.session will be null and user sees the message below.
+        if (data.user && !data.session) {
+          setError('Check your email to confirm your account, then sign in.');
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        // AuthGuard in _layout.tsx watches onAuthStateChange and navigates to tabs.
+      }
+    } catch (e: any) {
+      setError(e.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -225,16 +258,31 @@ export default function AuthScreen() {
             </Pressable>
           )}
 
+          {/* Error message */}
+          {error && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={15} color="#EF4444" />
+              <ThemedText lightColor="#EF4444" darkColor="#EF4444" style={styles.errorText}>
+                {error}
+              </ThemedText>
+            </View>
+          )}
+
           {/* Primary button */}
           <Pressable
             style={({ pressed }) => [
               styles.submitBtn,
-              { backgroundColor: tint, opacity: pressed ? 0.84 : 1 },
+              { backgroundColor: tint, opacity: submitting || pressed ? 0.84 : 1 },
             ]}
-            onPress={handleSubmit}>
-            <ThemedText lightColor="#fff" darkColor="#fff" style={styles.submitText}>
-              {isSignUp ? 'Create Account' : 'Sign In'}
-            </ThemedText>
+            onPress={handleSubmit}
+            disabled={submitting}>
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText lightColor="#fff" darkColor="#fff" style={styles.submitText}>
+                {isSignUp ? 'Create Account' : 'Sign In'}
+              </ThemedText>
+            )}
           </Pressable>
 
           {/* Social divider */}
@@ -365,4 +413,16 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 14, opacity: 0.58 },
   footerLink: { fontSize: 14, fontWeight: '700' },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+  },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
 });

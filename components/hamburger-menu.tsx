@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth';
 
 const DRAWER_WIDTH = Dimensions.get('window').width * 0.74;
 
@@ -24,6 +25,10 @@ export default function HamburgerMenu({ visible, onClose }: Props) {
   const tint = Colors[colorScheme].tint;
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
+
+  const { user, signOut } = useAuth();
+  const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
+  const displayEmail = user?.email ?? '';
 
   const slideAnim = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
@@ -58,13 +63,13 @@ export default function HamburgerMenu({ visible, onClose }: Props) {
             darkColor="#fff"
             type="defaultSemiBold"
             style={styles.drawerName}>
-            John Doe
+            {displayName}
           </ThemedText>
           <ThemedText
             lightColor="rgba(255,255,255,0.72)"
             darkColor="rgba(255,255,255,0.72)"
             style={styles.drawerEmail}>
-            johndoe@email.com
+            {displayEmail}
           </ThemedText>
         </View>
 
@@ -89,7 +94,7 @@ export default function HamburgerMenu({ visible, onClose }: Props) {
         {/* Sign out */}
         <Pressable
           style={[styles.menuItem, styles.signOutRow, { borderTopColor: border }]}
-          onPress={onClose}>
+          onPress={() => { onClose(); signOut(); }}>
           <View style={[styles.menuIconWrap, { backgroundColor: '#FEE2E2' }]}>
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           </View>
