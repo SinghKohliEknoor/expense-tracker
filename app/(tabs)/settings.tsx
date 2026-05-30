@@ -1,14 +1,19 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import SelectCurrencyModal from '@/components/select-currency-modal';
+import SelectThemeModal from '@/components/select-theme-modal';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
 import { useCurrency } from '@/context/currency-context';
+import { useTheme } from '@/context/theme-context';
+import { useNotificationPrefs } from '@/context/notification-prefs-context';
+import { getNotificationPermissionStatus, requestNotificationPermission } from '@/lib/notifications';
 
 type SettingRow = {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -69,12 +74,23 @@ export default function SettingsScreen() {
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
 
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const { currency } = useCurrency();
+  const { enabled: notifEnabled, setEnabled: setNotifEnabled } = useNotificationPrefs();
+  const { preference: themePref, setPreference: setThemePref } = useTheme();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showThemePicker,    setShowThemePicker]    = useState(false);
+  const [permStatus, setPermStatus] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
+
+  useEffect(() => {
+    getNotificationPermissionStatus().then(setPermStatus);
+  }, []);
 
   const displayName  = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const displayEmail = user?.email ?? '';
+
+  const notifValue = permStatus === 'denied' ? 'Restricted' : notifEnabled ? 'On' : 'Off';
 
   const APP_SETTINGS: SettingRow[] = [
     {
@@ -84,8 +100,29 @@ export default function SettingsScreen() {
       onPress: () => setShowCurrencyPicker(true),
     },
     { icon: 'settings-outline',          label: 'Preferences' },
-    { icon: 'notifications-outline',     label: 'Notifications' },
-    { icon: 'color-palette-outline',     label: 'Appearance' },
+    {
+      icon: 'notifications-outline',
+      label: 'Notifications',
+      value: notifValue,
+      onPress: async () => {
+        if (permStatus === 'denied') {
+          Linking.openSettings();
+        } else if (permStatus === 'undetermined') {
+          const granted = await requestNotificationPermission();
+          const next = granted ? 'granted' : 'denied';
+          setPermStatus(next);
+          if (granted) setNotifEnabled(true);
+        } else {
+          setNotifEnabled(!notifEnabled);
+        }
+      },
+    },
+    {
+      icon: 'color-palette-outline',
+      label: 'Appearance',
+      value: themePref.charAt(0).toUpperCase() + themePref.slice(1),
+      onPress: () => setShowThemePicker(true),
+    },
     { icon: 'help-circle-outline',       label: 'Help & Support' },
     { icon: 'information-circle-outline',label: 'About' },
   ];
@@ -174,7 +211,7 @@ export default function SettingsScreen() {
             styles.signOutBtn,
             { backgroundColor: card, borderColor: border, opacity: pressed ? 0.7 : 1 },
           ]}
-          onPress={signOut}>
+          onPress={async () => { await signOut(); router.replace('/login'); }}>
           <Ionicons name="log-out-outline" size={18} color="#EF4444" />
           <ThemedText lightColor="#EF4444" darkColor="#EF4444" style={styles.signOutText}>
             Sign Out
@@ -185,6 +222,12 @@ export default function SettingsScreen() {
       <SelectCurrencyModal
         visible={showCurrencyPicker}
         onClose={() => setShowCurrencyPicker(false)}
+      />
+      <SelectThemeModal
+        visible={showThemePicker}
+        current={themePref}
+        onSelect={setThemePref}
+        onClose={() => setShowThemePicker(false)}
       />
     </ThemedView>
   );

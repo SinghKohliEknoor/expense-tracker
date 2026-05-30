@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import AddTransactionModal from '@/components/add-transaction-modal';
+import TransactionRow from '@/components/transaction-row';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
 import { useBalance } from '@/hooks/use-balance';
 import { useTransactions } from '@/hooks/use-transactions';
-import { formatDisplayDate } from '@/utils/dates';
 import { useCurrency } from '@/context/currency-context';
+import { useTransactionRefresh } from '@/context/transaction-refresh-context';
+import { supabase } from '@/lib/supabase';
+import type { TransactionWithCategory } from '@/types/database';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -26,8 +29,11 @@ export default function HomeScreen() {
   const { balance, monthIncome, monthExpenses, loading: loadingBalance, refetch: refetchBalance } = useBalance();
   const { transactions: recent, loading: loadingTx, refetch: refetchTx } = useTransactions({ limit: 5 });
 
+  const { invalidate } = useTransactionRefresh();
+
   const [showExpense, setShowExpense] = useState(false);
   const [showIncome, setShowIncome]   = useState(false);
+  const [editTarget, setEditTarget]   = useState<TransactionWithCategory | null>(null);
 
   const firstName = user?.user_metadata?.full_name?.split(' ')[0]
     ?? user?.email?.split('@')[0]
@@ -38,6 +44,12 @@ export default function HomeScreen() {
   function handleSaved() {
     refetchBalance();
     refetchTx();
+  }
+
+  async function handleDelete(tx: TransactionWithCategory) {
+    const { error } = await (supabase.from('transactions') as any).delete().eq('id', tx.id).eq('user_id', user!.id);
+    if (error) { Alert.alert('Error', error.message); return; }
+    invalidate();
   }
 
   const QUICK_ACTIONS = [
@@ -151,42 +163,16 @@ export default function HomeScreen() {
           ) : (
             <View style={[styles.txCard, { backgroundColor: card, borderColor: border }]}>
               {recent.map((tx, i) => (
-                <View key={tx.id}>
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.txRow,
-                      pressed && { backgroundColor: tint + '0A' },
-                    ]}>
-                    <View
-                      style={[
-                        styles.txIcon,
-                        { backgroundColor: (tx.category?.color ?? tint) + '18' },
-                      ]}>
-                      <Ionicons
-                        name={(tx.category?.icon ?? 'ellipse-outline') as any}
-                        size={20}
-                        color={tx.category?.color ?? tint}
-                      />
-                    </View>
-                    <View style={styles.txInfo}>
-                      <ThemedText type="defaultSemiBold" style={styles.txTitle}>
-                        {tx.category?.name ?? 'Uncategorised'}
-                      </ThemedText>
-                      <ThemedText style={styles.txDate}>
-                        {tx.note ? `${tx.note} · ` : ''}{formatDisplayDate(tx.date)}
-                      </ThemedText>
-                    </View>
-                    <ThemedText
-                      lightColor={tx.type === 'income' ? '#22C55E' : '#EF4444'}
-                      darkColor={tx.type === 'income' ? '#22C55E' : '#EF4444'}
-                      style={styles.txAmount}>
-                      {tx.type === 'income' ? '+' : '-'}{fmt(Number(tx.amount))}
-                    </ThemedText>
-                  </Pressable>
-                  {i < recent.length - 1 && (
-                    <View style={[styles.txDivider, { backgroundColor: border }]} />
-                  )}
-                </View>
+                <TransactionRow
+                  key={tx.id}
+                  transaction={tx}
+                  accentColor={tx.type === 'income' ? '#22C55E' : '#EF4444'}
+                  amountPrefix={tx.type === 'income' ? '+' : '-'}
+                  fmt={fmt}
+                  onEdit={(t) => setEditTarget(t)}
+                  onDelete={handleDelete}
+                  isLast={i === recent.length - 1}
+                />
               ))}
             </View>
           )}
@@ -205,6 +191,13 @@ export default function HomeScreen() {
         onClose={() => setShowIncome(false)}
         onSaved={handleSaved}
       />
+      <AddTransactionModal
+        visible={!!editTarget}
+        type={editTarget?.type ?? 'expense'}
+        editTransaction={editTarget ?? undefined}
+        onClose={() => setEditTarget(null)}
+        onSaved={handleSaved}
+      />
     </ThemedView>
   );
 }
@@ -218,9 +211,9 @@ const styles = StyleSheet.create({
   greetSub: { fontSize: 13, opacity: 0.55, marginBottom: 2 },
   greetName: { fontSize: 22 },
 
-  balanceCard: { borderRadius: 22, padding: 24, marginBottom: 26 },
+  balanceCard: { borderRadius: 22, padding: 24, paddingTop: 22, paddingBottom: 22, marginBottom: 26 },
   balanceLabel: { fontSize: 13, marginBottom: 6 },
-  balanceAmount: { fontSize: 34, fontWeight: '800', marginBottom: 22 },
+  balanceAmount: { fontSize: 34, fontWeight: '800', lineHeight: 44, marginBottom: 16 },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
   statItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   statIcon: {
@@ -255,11 +248,4 @@ const styles = StyleSheet.create({
   emptySubText: { fontSize: 13, opacity: 0.5 },
 
   txCard: { borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  txRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  txIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  txInfo: { flex: 1 },
-  txTitle: { fontSize: 14, marginBottom: 2 },
-  txDate: { fontSize: 12, opacity: 0.48 },
-  txAmount: { fontSize: 14, fontWeight: '600' },
-  txDivider: { height: StyleSheet.hairlineWidth, marginLeft: 70 },
 });

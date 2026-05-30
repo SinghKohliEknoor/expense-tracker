@@ -1,56 +1,57 @@
 import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import { ThemeContextProvider } from '@/context/theme-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/hooks/use-auth';
 import { CurrencyProvider } from '@/context/currency-context';
 import { TransactionRefreshProvider } from '@/context/transaction-refresh-context';
+import { NotificationPrefsProvider, useNotificationPrefs } from '@/context/notification-prefs-context';
+import { useBudgetAlerts } from '@/hooks/use-budget-alerts';
+import { requestNotificationPermission } from '@/lib/notifications';
 
 export const unstable_settings = {
-  anchor: 'index',
+  anchor: 'login',
 };
 
-function AuthGuard() {
-  const { session, loading } = useAuth();
-  const router = useRouter();
-  const segments = useSegments();
-
-  useEffect(() => {
-    if (loading) return;
-
-    const inTabs = segments[0] === '(tabs)';
-
-    if (session && !inTabs) {
-      // Signed in but on auth screen → go to app
-      router.replace('/(tabs)');
-    } else if (!session && inTabs) {
-      // Signed out but still inside tabs → back to sign-in
-      router.replace('/');
-    }
-  }, [session, loading, segments]);
-
+function BudgetAlertsRunner() {
+  const { enabled } = useNotificationPrefs();
+  useBudgetAlerts(enabled);
   return null;
 }
 
-export default function RootLayout() {
+function ThemedApp() {
   const colorScheme = useColorScheme();
 
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
+
   return (
-    <TransactionRefreshProvider>
     <CurrencyProvider>
+    <NotificationPrefsProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AuthGuard />
+      <BudgetAlertsRunner />
       <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="budget" options={{ headerShown: false }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
+    </NotificationPrefsProvider>
     </CurrencyProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <TransactionRefreshProvider>
+    <ThemeContextProvider>
+      <ThemedApp />
+    </ThemeContextProvider>
     </TransactionRefreshProvider>
   );
 }

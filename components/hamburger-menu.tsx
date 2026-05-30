@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -26,6 +27,7 @@ export default function HamburgerMenu({ visible, onClose }: Props) {
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
 
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const displayEmail = user?.email ?? '';
@@ -94,7 +96,7 @@ export default function HamburgerMenu({ visible, onClose }: Props) {
         {/* Sign out */}
         <Pressable
           style={[styles.menuItem, styles.signOutRow, { borderTopColor: border }]}
-          onPress={() => { onClose(); signOut(); }}>
+          onPress={async () => { onClose(); await signOut(); router.replace('/login'); }}>
           <View style={[styles.menuIconWrap, { backgroundColor: '#FEE2E2' }]}>
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
           </View>

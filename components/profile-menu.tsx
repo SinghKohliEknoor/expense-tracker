@@ -1,4 +1,5 @@
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
@@ -27,6 +28,7 @@ export default function ProfileMenu({ visible, onClose }: Props) {
   const card = Colors[colorScheme].card;
   const border = Colors[colorScheme].border;
 
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const displayName = user?.user_metadata?.full_name ?? user?.email?.split('@')[0] ?? 'User';
   const displayEmail = user?.email ?? '';
@@ -67,7 +69,7 @@ export default function ProfileMenu({ visible, onClose }: Props) {
                 styles.actionRow,
                 pressed && { backgroundColor: tint + '10' },
               ]}
-              onPress={() => { onClose(); if (action.label === 'Sign Out') signOut(); }}>
+              onPress={async () => { onClose(); if (action.label === 'Sign Out') { await signOut(); router.replace('/login'); } }}>
               <Ionicons
                 name={action.icon}
                 size={18}

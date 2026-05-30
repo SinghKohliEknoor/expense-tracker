@@ -74,7 +74,7 @@ export default function AddBudgetModal({ visible, onClose, onSaved }: Props) {
 
     setSaving(true);
     setError(null);
-    const { error: err } = await supabase.from('budgets').insert({
+    const { error: err } = await (supabase.from('budgets') as any).insert({
       user_id: user.id,
       category_id: categoryId,
       amount: num,

@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { useAuth } from '@/hooks/use-auth';
 
 import { HapticTab } from '@/components/haptic-tab';
 import HamburgerMenu from '@/components/hamburger-menu';
@@ -10,14 +12,22 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
+  const { session, loading } = useAuth();
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
   const tint = Colors[colorScheme].tint;
   const card = Colors[colorScheme].card;
   const text = Colors[colorScheme].text;
   const border = Colors[colorScheme].border;
 
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  useEffect(() => {
+    if (!loading && !session) {
+      router.replace('/login');
+    }
+  }, [loading, session]);
 
   return (
     <>

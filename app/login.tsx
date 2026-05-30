@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -9,12 +9,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 
 // ─── Reusable input ───────────────────────────────────────────────────────────
@@ -93,13 +95,9 @@ const field = StyleSheet.create({
 type Mode = 'signin' | 'signup';
 
 export default function AuthScreen() {
+  const { session, loading } = useAuth();
+  const router = useRouter();
   const colorScheme = useColorScheme() ?? 'light';
-  const tint = Colors[colorScheme].tint;
-  const card = Colors[colorScheme].card;
-  const text = Colors[colorScheme].text;
-  const border = Colors[colorScheme].border;
-  const inputBg = colorScheme === 'light' ? '#F0ECFF' : '#1E1535';
-
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -107,6 +105,18 @@ export default function AuthScreen() {
   const [confirmPwd, setConfirmPwd] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const tint = Colors[colorScheme].tint;
+  const card = Colors[colorScheme].card;
+  const text = Colors[colorScheme].text;
+  const border = Colors[colorScheme].border;
+  const inputBg = colorScheme === 'light' ? '#F0ECFF' : '#1E1535';
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.replace('/(tabs)');
+    }
+  }, [loading, session]);
 
   const isSignUp = mode === 'signup';
 

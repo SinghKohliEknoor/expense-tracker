@@ -20,7 +20,7 @@ import { useCategories } from '@/hooks/use-categories';
 import { useCurrency } from '@/context/currency-context';
 import { useTransactionRefresh } from '@/context/transaction-refresh-context';
 import { supabase } from '@/lib/supabase';
-import type { CategoryType } from '@/types/database';
+import type { CategoryType, TransactionWithCategory } from '@/types/database';
 import { today } from '@/utils/dates';
 
 const ACCENT: Record<CategoryType, string> = { expense: '#EF4444', income: '#22C55E' };
@@ -42,9 +42,10 @@ type Props = {
   type: CategoryType;
   onClose: () => void;
   onSaved: () => void;
+  editTransaction?: TransactionWithCategory;
 };
 
-export default function AddTransactionModal({ visible, type, onClose, onSaved }: Props) {
+export default function AddTransactionModal({ visible, type, onClose, onSaved, editTransaction }: Props) {
   const colorScheme = useColorScheme() ?? 'light';
   const card      = Colors[colorScheme].card;
   const border    = Colors[colorScheme].border;
@@ -52,6 +53,7 @@ export default function AddTransactionModal({ visible, type, onClose, onSaved }:
   const iconColor = Colors[colorScheme].icon;
   const bgColor   = Colors[colorScheme].background;
   const accent    = ACCENT[type];
+  const isEdit    = !!editTransaction;
 
   const { user } = useAuth();
   const { categories } = useCategories(type);
@@ -66,18 +68,25 @@ export default function AddTransactionModal({ visible, type, onClose, onSaved }:
   const [saving, setSaving]               = useState(false);
   const [error, setError]                 = useState<string | null>(null);
 
-  // Reset form on open
+  // Reset or pre-fill form on open
   useEffect(() => {
     if (visible) {
-      setAmount('');
-      setCategoryId(null);
-      setDate(today());
+      if (editTransaction) {
+        setAmount(String(editTransaction.amount));
+        setCategoryId(editTransaction.category_id);
+        setDate(editTransaction.date);
+        setNote(editTransaction.note ?? '');
+      } else {
+        setAmount('');
+        setCategoryId(null);
+        setDate(today());
+        setNote('');
+      }
       setShowDatePicker(false);
-      setNote('');
       setError(null);
       setSaving(false);
     }
-  }, [visible]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-select first category when list loads
   useEffect(() => {
@@ -99,16 +108,28 @@ export default function AddTransactionModal({ visible, type, onClose, onSaved }:
 
     setSaving(true);
     setError(null);
-    const { error: err } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      amount: num,
-      type,
-      category_id: categoryId,
-      note: note.trim() || null,
-      date,
-    });
-    setSaving(false);
 
+    let err: { message: string } | null = null;
+
+    if (isEdit && editTransaction) {
+      const res = await (supabase.from('transactions') as any)
+        .update({ amount: num, category_id: categoryId, note: note.trim() || null, date })
+        .eq('id', editTransaction.id)
+        .eq('user_id', user.id);
+      err = res.error;
+    } else {
+      const res = await (supabase.from('transactions') as any).insert({
+        user_id: user.id,
+        amount: num,
+        type,
+        category_id: categoryId,
+        note: note.trim() || null,
+        date,
+      });
+      err = res.error;
+    }
+
+    setSaving(false);
     if (err) { setError(err.message); return; }
     invalidate();
     onSaved();
@@ -137,7 +158,9 @@ export default function AddTransactionModal({ visible, type, onClose, onSaved }:
           {/* Header */}
           <View style={s.header}>
             <ThemedText type="defaultSemiBold" style={s.title}>
-              {type === 'expense' ? 'Add Expense' : 'Add Income'}
+              {isEdit
+                ? (type === 'expense' ? 'Edit Expense' : 'Edit Income')
+                : (type === 'expense' ? 'Add Expense' : 'Add Income')}
             </ThemedText>
             <Pressable onPress={onClose} hitSlop={10}>
               <Ionicons name="close-circle" size={26} color={border} />
@@ -254,7 +277,7 @@ export default function AddTransactionModal({ visible, type, onClose, onSaved }:
               onPress={handleSave}
               disabled={saving}>
               <ThemedText lightColor="#fff" darkColor="#fff" style={s.saveTxt}>
-                {saving ? 'Saving…' : type === 'expense' ? 'Save Expense' : 'Save Income'}
+                {saving ? 'Saving…' : isEdit ? 'Save Changes' : type === 'expense' ? 'Save Expense' : 'Save Income'}
               </ThemedText>
             </Pressable>
 
